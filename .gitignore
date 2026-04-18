@@ -1,0 +1,22 @@
+# Gradle files
+.gradle/
+build/
+
+# IDE specific files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# Minecraft/Forge/Fabric specific
+run/
+out/
+logs/
+
+# OS specific
+.DS_Store
+thumbs.db

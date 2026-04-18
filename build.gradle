@@ -1,0 +1,84 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+// ─────────────────────────────────────────────────────────────────
+// Minecraft version enforcement: 26.1.x or higher
+// ─────────────────────────────────────────────────────────────────
+def mcVersionStr   = project.minecraft_version
+def mcVersionParts = mcVersionStr.tokenize('.')
+try {
+	int yearPart  = Integer.parseInt(mcVersionParts[0])
+	int majorPart = mcVersionParts.size() > 1 ? Integer.parseInt(mcVersionParts[1]) : 0
+	if (yearPart < 26 || (yearPart == 26 && majorPart < 1)) {
+		throw new GradleException(
+			"\n==========================================\n" +
+			"  Stack Mobs requires Minecraft 26.1.x+\n" +
+			"  Detected version : ${mcVersionStr}\n" +
+			"  Update 'minecraft_version' in gradle.properties\n" +
+			"==========================================\n"
+		)
+	}
+} catch (NumberFormatException e) {
+	throw new GradleException("Could not parse Minecraft version: '${mcVersionStr}'")
+}
+
+repositories {
+	// Loom adds the essential maven repositories automatically.
+}
+
+loom {
+	mods {
+		"stackmobs" {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": inputs.properties.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	inputs.property "projectName", project.name
+
+	from("LICENSE") {
+		rename { "${it}_${project.name}" }
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+}

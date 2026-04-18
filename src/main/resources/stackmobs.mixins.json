@@ -1,0 +1,19 @@
+{
+	"required": true,
+	"package": "com.stackmobs.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"MobEntityMixin",
+		"AgeableMobMixin",
+		"LivingEntityMixin",
+		"LivingEntityDropAccessor",
+		"AnimalFeedingMixin",
+		"SheepShearingMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

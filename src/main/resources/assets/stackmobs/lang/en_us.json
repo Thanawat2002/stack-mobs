@@ -1,0 +1,27 @@
+{
+  "stackmobs.command.reload.success": "Stack Mobs configuration reloaded.",
+  "stackmobs.command.reload.failed": "Failed to reload configuration: %s",
+  "stackmobs.command.toggle.enabled": "Stack Mobs stacking is now ENABLED.",
+  "stackmobs.command.toggle.disabled": "Stack Mobs stacking is now DISABLED.",
+  "stackmobs.command.info.header": "=== Stack Mobs Info ===",
+  "stackmobs.command.info.enabled": "Enabled: %s",
+  "stackmobs.command.info.radius": "Stack Radius: %d blocks",
+  "stackmobs.command.info.max_size": "Max Stack Size: %d",
+  "stackmobs.command.info.merge_delay": "Merge Delay: %d ticks",
+  "stackmobs.command.info.total_stacks": "Active Stacks: %d",
+  "stackmobs.command.info.total_entities_saved": "Entities Saved: %d",
+  "stackmobs.command.unstack.success": "Unstacked %d mobs near you.",
+  "stackmobs.command.unstack.none": "No stacked mobs found nearby.",
+  "stackmobs.command.killall.success": "Killed %d stacked mobs.",
+  "stackmobs.command.killall.none": "No stacked mobs to kill.",
+  "stackmobs.command.debug.header": "=== Stack Mobs Debug ===",
+  "stackmobs.command.debug.entity": "Entity: %s | Stack: %d | World: %s",
+  "stackmobs.command.no_permission": "You do not have permission to use this command.",
+
+  "stackmobs.nametag.format": "%s x%d",
+  "stackmobs.nametag.format_health": "%s x%d [%.0f%%]",
+
+  "stackmobs.merge.particle": "Mobs merged!",
+
+  "item.stackmobs.debug_wand": "Stack Debug Wand"
+}

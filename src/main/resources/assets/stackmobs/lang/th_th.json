@@ -1,0 +1,27 @@
+{
+  "stackmobs.command.reload.success": "โหลดการตั้งค่า Stack Mobs ใหม่เรียบร้อยแล้ว",
+  "stackmobs.command.reload.failed": "โหลดการตั้งค่าล้มเหลว: %s",
+  "stackmobs.command.toggle.enabled": "Stack Mobs เปิดใช้งานแล้ว",
+  "stackmobs.command.toggle.disabled": "Stack Mobs ปิดใช้งานแล้ว",
+  "stackmobs.command.info.header": "=== ข้อมูล Stack Mobs ===",
+  "stackmobs.command.info.enabled": "เปิดใช้งาน: %s",
+  "stackmobs.command.info.radius": "รัศมีสแตก: %d บล็อก",
+  "stackmobs.command.info.max_size": "สแตกสูงสุด: %d",
+  "stackmobs.command.info.merge_delay": "หน่วงการรวม: %d ติ๊ก",
+  "stackmobs.command.info.total_stacks": "สแตกที่ใช้งานอยู่: %d",
+  "stackmobs.command.info.total_entities_saved": "เอนทิตีที่ประหยัดได้: %d",
+  "stackmobs.command.unstack.success": "แยกม็อบ %d ตัวใกล้คุณแล้ว",
+  "stackmobs.command.unstack.none": "ไม่พบม็อบที่ถูกสแตกอยู่ใกล้ๆ",
+  "stackmobs.command.killall.success": "กำจัดม็อบสแตก %d ตัวแล้ว",
+  "stackmobs.command.killall.none": "ไม่มีม็อบสแตกให้กำจัด",
+  "stackmobs.command.debug.header": "=== ดีบัก Stack Mobs ===",
+  "stackmobs.command.debug.entity": "เอนทิตี: %s | สแตก: %d | โลก: %s",
+  "stackmobs.command.no_permission": "คุณไม่มีสิทธิ์ใช้คำสั่งนี้",
+
+  "stackmobs.nametag.format": "%s x%d",
+  "stackmobs.nametag.format_health": "%s x%d [%.0f%%]",
+
+  "stackmobs.merge.particle": "ม็อบถูกรวมแล้ว!",
+
+  "item.stackmobs.debug_wand": "ไม้กายสิทธิ์ดีบักสแตก"
+}
