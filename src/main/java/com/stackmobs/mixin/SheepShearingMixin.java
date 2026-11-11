@@ -7,12 +7,13 @@ import com.stackmobs.stacking.StackUtils;
 import com.stackmobs.stacking.StackedMob;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -134,7 +135,7 @@ public class SheepShearingMixin {
         int remaining = stackSize - sheepToShear;
         if (remaining > 0) {
             try {
-                Sheep unsheared = new Sheep(EntityType.SHEEP, level);
+                Sheep unsheared = new Sheep(EntityTypes.SHEEP, level);
 
                 Random rng = new Random();
                 double ox = (rng.nextDouble() - 0.5) * 1.0;
@@ -160,23 +161,7 @@ public class SheepShearingMixin {
     // ── Helper: wool item for a given DyeColor ────────────────────────────────
 
     private static Item getWoolItem(DyeColor color) {
-        return switch (color) {
-            case ORANGE     -> net.minecraft.world.item.Items.ORANGE_WOOL;
-            case MAGENTA    -> net.minecraft.world.item.Items.MAGENTA_WOOL;
-            case LIGHT_BLUE -> net.minecraft.world.item.Items.LIGHT_BLUE_WOOL;
-            case YELLOW     -> net.minecraft.world.item.Items.YELLOW_WOOL;
-            case LIME       -> net.minecraft.world.item.Items.LIME_WOOL;
-            case PINK       -> net.minecraft.world.item.Items.PINK_WOOL;
-            case GRAY       -> net.minecraft.world.item.Items.GRAY_WOOL;
-            case LIGHT_GRAY -> net.minecraft.world.item.Items.LIGHT_GRAY_WOOL;
-            case CYAN       -> net.minecraft.world.item.Items.CYAN_WOOL;
-            case PURPLE     -> net.minecraft.world.item.Items.PURPLE_WOOL;
-            case BLUE       -> net.minecraft.world.item.Items.BLUE_WOOL;
-            case BROWN      -> net.minecraft.world.item.Items.BROWN_WOOL;
-            case GREEN      -> net.minecraft.world.item.Items.GREEN_WOOL;
-            case RED        -> net.minecraft.world.item.Items.RED_WOOL;
-            case BLACK      -> net.minecraft.world.item.Items.BLACK_WOOL;
-            default         -> net.minecraft.world.item.Items.WHITE_WOOL;
-        };
+        // 26.3+: per-colour wool items live in a ColorCollection keyed by DyeColor
+        return Items.WOOL.pick(color);
     }
 }

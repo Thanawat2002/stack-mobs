@@ -3,7 +3,7 @@
 A production-ready Fabric mod that merges nearby identical mobs into stacked
 entities to improve server performance and enhance gameplay.
 
-**Requires Minecraft 26.1.x or higher · Fabric Loader · Java 21**
+**Requires Minecraft 26.3.x · Fabric Loader 0.20.1+ · Java 25**
 
 ---
 
@@ -27,10 +27,10 @@ entities to improve server performance and enhance gameplay.
 
 | Dependency | Version |
 |---|---|
-| Minecraft | **≥ 26.1.x** (enforced by Gradle) |
-| Fabric Loader | ≥ 0.16.9 |
+| Minecraft | **26.3.x** (enforced by `fabric.mod.json`) |
+| Fabric Loader | ≥ 0.20.1 |
 | Fabric API | Compatible with your Minecraft build |
-| Java | 21 |
+| Java | 25 |
 
 ---
 
@@ -63,14 +63,14 @@ The compiled jar will be at `build/libs/stack-mobs-<version>.jar`.
 ./gradlew runServer   # dedicated server
 ```
 
-> **Note** – update the three version properties in `gradle.properties` to
-> match the exact Fabric/Yarn build numbers for your target Minecraft release:
+> **Note** – update the version properties in `gradle.properties` to
+> match the exact Fabric build numbers for your target Minecraft release:
 >
 > ```properties
-> minecraft_version=26.1.1
-> yarn_mappings=26.1.1+build.1
-> loader_version=0.16.9
-> fabric_version=0.100.0+26.1.1
+> minecraft_version=26.3
+> loader_version=0.20.1
+> loom_version=1.19-SNAPSHOT
+> fabric_api_version=0.166.0+26.3
 > ```
 >
 > Check current values at <https://fabricmc.net/develop/>.
