@@ -16,6 +16,8 @@ public final class Constants {
     public static final String NBT_VIRTUAL_AGES   = "StackMobs_VirtualAges";
     /** NBT key for the game-time tick when the breed cooldown expires. */
     public static final String NBT_BREED_COOLDOWN = "StackMobs_BreedCooldown";
+    /** NBT key for the text of the "Mob xN" label this mod last set. */
+    public static final String NBT_LABEL          = "StackMobs_Label";
 
     // ── Config defaults ──────────────────────────────────────────────────────
     public static final boolean DEFAULT_ENABLED          = true;

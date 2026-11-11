@@ -24,6 +24,7 @@ public abstract class MobEntityMixin implements StackedMob {
     @Unique private int   stackmobs_stackSize          = 1;
     @Unique private int[] stackmobs_virtualAges         = new int[0];
     @Unique private long  stackmobs_breedCooldownUntil  = 0L;
+    @Unique private String stackmobs_label              = null;
 
     // ── StackedMob ────────────────────────────────────────────────────────────
 
@@ -53,6 +54,9 @@ public abstract class MobEntityMixin implements StackedMob {
     @Override public long stackmobs$getBreedCooldownUntil()       { return stackmobs_breedCooldownUntil; }
     @Override public void stackmobs$setBreedCooldownUntil(long t)  { stackmobs_breedCooldownUntil = t; }
 
+    @Override public String stackmobs$getLabel()             { return stackmobs_label; }
+    @Override public void   stackmobs$setLabel(String label) { stackmobs_label = label; }
+
     // ── Persistence ───────────────────────────────────────────────────────────
 
     @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
@@ -64,6 +68,9 @@ public abstract class MobEntityMixin implements StackedMob {
         if (stackmobs_breedCooldownUntil > 0) {
             output.putLong(Constants.NBT_BREED_COOLDOWN, stackmobs_breedCooldownUntil);
         }
+        if (stackmobs_label != null) {
+            output.putString(Constants.NBT_LABEL, stackmobs_label);
+        }
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
@@ -71,5 +78,6 @@ public abstract class MobEntityMixin implements StackedMob {
         stackmobs_stackSize         = Math.max(1, input.getIntOr(Constants.NBT_STACK_SIZE, 1));
         stackmobs_virtualAges        = input.getIntArray(Constants.NBT_VIRTUAL_AGES).orElse(new int[0]);
         stackmobs_breedCooldownUntil = input.getLongOr(Constants.NBT_BREED_COOLDOWN, 0L);
+        stackmobs_label              = input.getString(Constants.NBT_LABEL).orElse(null);
     }
 }

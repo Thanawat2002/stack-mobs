@@ -69,9 +69,7 @@ public abstract class LivingEntityMixin {
         StackManager manager = StackManager.getInstance();
         if (manager == null) return;
 
-        sm.stackmobs$setStackSize(1);
-        self.setCustomName(null);
-        self.setCustomNameVisible(false);
+        StackUtils.setStackSize(mob, 1, manager.getConfig()); // keeps a player-given name
         manager.syncRegistry(mob, level);
         // vanilla applies the damage and kills the primary
     }
@@ -120,9 +118,7 @@ public abstract class LivingEntityMixin {
             for (int i = 0; i < stackSize - 1; i++) {
                 manager.onStackMemberKilled(mob, level, source);
             }
-            sm.stackmobs$setStackSize(1);
-            self.setCustomName(null);
-            self.setCustomNameVisible(false);
+            StackUtils.setStackSize(mob, 1, manager.getConfig());
             setHealth.call(self, newHealth);
             return;
         }
@@ -136,16 +132,7 @@ public abstract class LivingEntityMixin {
         float damageRemainder = overflow % maxHealth;
         float survivorHealth  = Math.max(0.5f, maxHealth - damageRemainder);
 
-        sm.stackmobs$setStackSize(newSize);
-
-        if (newSize > 1) {
-            self.setCustomName(StackUtils.buildNameTag(mob, newSize,
-                manager.getConfig().showHealthBar));
-            self.setCustomNameVisible(true);
-        } else {
-            self.setCustomName(null);
-            self.setCustomNameVisible(false);
-        }
+        StackUtils.setStackSize(mob, newSize, manager.getConfig());
         manager.syncRegistry(mob, level);
 
         // The next member steps in with the leftover damage applied

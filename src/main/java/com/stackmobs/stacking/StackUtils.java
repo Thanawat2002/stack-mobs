@@ -28,6 +28,7 @@ import net.minecraft.world.phys.AABB;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * Stateless utility helpers for stacking logic.
@@ -276,14 +277,58 @@ public final class StackUtils {
 
         int clamped = Math.max(1, stackSize);
         sm.stackmobs$setStackSize(clamped);
+        applyLabel(entity, clamped, config);
+    }
 
-        if (clamped > 1) {
-            entity.setCustomName(buildNameTag(entity, clamped, config.showHealthBar));
+    // ── Stack label (custom name) ─────────────────────────────────────────────
+
+    /**
+     * Sets the "Mob xN" label for a stack of {@code size}, or clears it for a
+     * single mob — unless the mob carries a name someone else gave it (name
+     * tag, command). That name is never overwritten or cleared; the next
+     * name-tag refresh splits the renamed mob off its stack instead.
+     */
+    public static void applyLabel(Mob entity, int size, ModConfig config) {
+        if (!(entity instanceof StackedMob sm)) return;
+        if (hasForeignName(entity)) return;
+
+        if (size > 1) {
+            Component label = buildNameTag(entity, size, config.showHealthBar);
+            entity.setCustomName(label);
             entity.setCustomNameVisible(config.showNameTag);
+            sm.stackmobs$setLabel(label.getString());
         } else {
             entity.setCustomName(null);
             entity.setCustomNameVisible(false);
+            sm.stackmobs$setLabel(null);
         }
+    }
+
+    /**
+     * {@code true} when the mob's custom name was not set by this mod, i.e. a
+     * player named it with a name tag or a command changed it.
+     */
+    public static boolean hasForeignName(Mob entity) {
+        Component name = entity.getCustomName();
+        if (name == null || !(entity instanceof StackedMob sm)) return false;
+
+        String text = name.getString();
+        String own  = sm.stackmobs$getLabel();
+        if (own != null) return !own.equals(text);
+
+        // Stacks saved before labels were tracked (1.1.0 and earlier) have no
+        // stored label: accept anything shaped like our own label.
+        if (getStackSize(entity) > 1 && looksLikeOwnLabel(entity, text)) {
+            sm.stackmobs$setLabel(text);
+            return false;
+        }
+        return true;
+    }
+
+    /** Matches "Cow x12", "♥ Cow x12" and "Cow x12 [70%]" for this mob's type. */
+    private static boolean looksLikeOwnLabel(Mob entity, String text) {
+        String base = entity.getType().getDescription().getString();
+        return text.matches("(♥ )?" + Pattern.quote(base) + " x\\d+( \\[\\d+%])?");
     }
 
     // ── Registry helpers ──────────────────────────────────────────────────────

@@ -136,27 +136,65 @@ public class StackManager {
     }
 
     /**
-     * Updates the custom-name visibility of every stacked mob in the given level
-     * based on player proximity. The name tag is shown only when at least one
-     * player is within {@link ModConfig#nameTagViewDistance} blocks.
-     */
-    /**
      * Rebuilds each stack's label when its text would change: the health %
      * after non-lethal hits, and the ♥ prefix when a breed cooldown expires.
      * Only sends an update when the text actually differs.
+     *
+     * <p>A stack whose primary was renamed (name tag, command) is split
+     * instead: the named mob keeps its name and leaves the stack.
      */
     private void refreshNameTags() {
-        for (MobStack stack : activeStacks.values()) {
+        // Snapshot: splitting registers a new stack while we iterate
+        for (MobStack stack : new ArrayList<>(activeStacks.values())) {
             if (!stack.isValid()) continue;
             Mob mob = stack.getPrimary();
             int size = StackUtils.getStackSize(mob);
             if (size < 2) continue;
 
+            if (StackUtils.hasForeignName(mob)) {
+                splitOffRenamed(mob);
+                continue;
+            }
+
             Component expected = StackUtils.buildNameTag(mob, size, config.showHealthBar);
             if (!expected.equals(mob.getCustomName())) {
-                mob.setCustomName(expected);
+                StackUtils.applyLabel(mob, size, config);
             }
         }
+    }
+
+    /**
+     * Splits a renamed primary off its stack. The named mob stays where it is
+     * as a single mob with its new name (a name tag also made it persistent,
+     * so it won't re-stack); the rest of the stack continues as a new,
+     * unnamed stack right next to it.
+     */
+    public void splitOffRenamed(Mob named) {
+        if (!(named.level() instanceof ServerLevel level)) return;
+        int size = StackUtils.getStackSize(named);
+        if (size <= 1) return;
+
+        int[] ages = ((StackedMob) named).stackmobs$getVirtualAges();
+        Mob rest = StackUtils.createCopy(named, level, 0.5);
+        if (rest == null) return;
+
+        // The rest's primary takes the first virtual baby's age
+        int[] restAges = ages;
+        if (named.isBaby() && rest instanceof AgeableMob ageableRest) {
+            ageableRest.setAge(ages.length > 0 ? Math.min(ages[0], -1) : -24000);
+            restAges = ages.length > 0 ? Arrays.copyOfRange(ages, 1, ages.length) : ages;
+        }
+        StackUtils.setStackSize(rest, size - 1, config);
+        ((StackedMob) rest).stackmobs$setVirtualAges(restAges);
+        level.addFreshEntity(rest);
+        syncRegistry(rest, level);
+
+        ((StackedMob) named).stackmobs$setVirtualAges(new int[0]);
+        StackUtils.setStackSize(named, 1, config); // keeps the player's name
+        syncRegistry(named, level);
+
+        StackMobsMod.LOGGER.debug("[StackMobs] Renamed {} split off its stack; {} remain stacked.",
+            StackUtils.getEntityId(named), size - 1);
     }
 
     /**

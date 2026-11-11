@@ -77,4 +77,13 @@ public interface StackedMob {
     default boolean stackmobs$isBreedCooldownActive(long gameTime) {
         return gameTime < stackmobs$getBreedCooldownUntil();
     }
+
+    /**
+     * Text of the stack label this mod last set as the custom name, or
+     * {@code null} if it set none. A custom name that differs was set by
+     * someone else (name tag, command) and must not be overwritten.
+     */
+    String stackmobs$getLabel();
+
+    void stackmobs$setLabel(String label);
 }
