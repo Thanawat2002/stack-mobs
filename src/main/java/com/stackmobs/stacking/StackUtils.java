@@ -91,6 +91,7 @@ public final class StackUtils {
         // with a custom name was named by a player or a command
         if (entity.hasCustomName() && getStackSize(entity) <= 1) return true;
         if (entity.isLeashed())                                   return true;
+        if (entity.isSaddled())                                   return true;
         if (entity.isPassenger() || entity.isVehicle())           return true;
         if (entity instanceof OwnableEntity ownable
                 && ownable.getOwnerReference() != null)           return true;

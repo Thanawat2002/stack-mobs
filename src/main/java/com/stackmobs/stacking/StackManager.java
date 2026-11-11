@@ -140,8 +140,9 @@ public class StackManager {
      * after non-lethal hits, and the ♥ prefix when a breed cooldown expires.
      * Only sends an update when the text actually differs.
      *
-     * <p>A stack whose primary was renamed (name tag, command) is split
-     * instead: the named mob keeps its name and leaves the stack.
+     * <p>A stack whose primary was renamed, saddled, leashed or otherwise taken
+     * over by a player is split instead: that mob leaves the stack with its
+     * name and equipment, so a member's death can't drop its saddle.
      */
     private void refreshNameTags() {
         // Snapshot: splitting registers a new stack while we iterate
@@ -151,8 +152,8 @@ public class StackManager {
             int size = StackUtils.getStackSize(mob);
             if (size < 2) continue;
 
-            if (StackUtils.hasForeignName(mob)) {
-                splitOffRenamed(mob);
+            if (StackUtils.hasForeignName(mob) || StackUtils.isPlayerManaged(mob)) {
+                splitOffPrimary(mob);
                 continue;
             }
 
@@ -164,12 +165,11 @@ public class StackManager {
     }
 
     /**
-     * Splits a renamed primary off its stack. The named mob stays where it is
-     * as a single mob with its new name (a name tag also made it persistent,
-     * so it won't re-stack); the rest of the stack continues as a new,
-     * unnamed stack right next to it.
+     * Splits the primary off its stack. It stays where it is as a single mob,
+     * keeping its name, saddle and lead (which also stop it re-stacking); the
+     * rest of the stack continues as a new, unnamed stack right next to it.
      */
-    public void splitOffRenamed(Mob named) {
+    public void splitOffPrimary(Mob named) {
         if (!(named.level() instanceof ServerLevel level)) return;
         int size = StackUtils.getStackSize(named);
         if (size <= 1) return;
@@ -193,7 +193,7 @@ public class StackManager {
         StackUtils.setStackSize(named, 1, config); // keeps the player's name
         syncRegistry(named, level);
 
-        StackMobsMod.LOGGER.debug("[StackMobs] Renamed {} split off its stack; {} remain stacked.",
+        StackMobsMod.LOGGER.debug("[StackMobs] {} split off its stack (renamed or player-managed); {} remain stacked.",
             StackUtils.getEntityId(named), size - 1);
     }
 
