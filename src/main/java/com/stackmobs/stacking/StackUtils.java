@@ -3,10 +3,19 @@ package com.stackmobs.stacking;
 import com.stackmobs.config.ModConfig;
 import com.stackmobs.util.Constants;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.OwnableEntity;
+import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.entity.npc.InventoryCarrier;
+import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.monster.ElderGuardian;
@@ -17,6 +26,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Stateless utility helpers for stacking logic.
@@ -38,7 +48,29 @@ public final class StackUtils {
         if (config.isBlacklisted(id))  return false;
         if (!config.isWhitelisted(id)) return false;
 
+        if (isPlayerManaged(entity))   return false;
+
         return true;
+    }
+
+    /**
+     * Mobs a player has invested in must never be merged: merging discards the
+     * secondary entity, which would delete its name, lead, owner, saddle,
+     * inventory or trades.
+     */
+    public static boolean isPlayerManaged(Mob entity) {
+        // Name tags and picked-up items both set persistence
+        if (entity.isPersistenceRequired())                       return true;
+        // Our own "Mob xN" label only exists while size > 1, so a single mob
+        // with a custom name was named by a player or a command
+        if (entity.hasCustomName() && getStackSize(entity) <= 1) return true;
+        if (entity.isLeashed())                                   return true;
+        if (entity.isPassenger() || entity.isVehicle())           return true;
+        if (entity instanceof OwnableEntity ownable
+                && ownable.getOwnerReference() != null)           return true;
+        if (entity instanceof InventoryCarrier)                   return true;
+        if (entity instanceof Merchant)                           return true;
+        return false;
     }
 
     public static boolean isBoss(Mob entity) {
@@ -57,7 +89,66 @@ public final class StackUtils {
                 && b instanceof net.minecraft.world.entity.animal.sheep.Sheep sheepB) {
             if (sheepA.isSheared() != sheepB.isSheared()) return false;
         }
+        // Variants must match: sheep colour, cow/pig/chicken variant, sound variant…
+        for (DataComponentType<?> type : variantComponentTypes()) {
+            if (!Objects.equals(a.get(type), b.get(type))) return false;
+        }
         return true;
+    }
+
+    // ── Variant components ────────────────────────────────────────────────────
+
+    private static List<DataComponentType<?>> variantComponentTypes;
+
+    /**
+     * Every data component type except name/custom data. Entities return
+     * {@code null} from {@link Mob#get} for types they don't carry, so this
+     * covers each mob's variant/colour components without listing them.
+     */
+    private static List<DataComponentType<?>> variantComponentTypes() {
+        if (variantComponentTypes == null) {
+            List<DataComponentType<?>> types = new ArrayList<>();
+            for (DataComponentType<?> type : BuiltInRegistries.DATA_COMPONENT_TYPE) {
+                if (type == DataComponents.CUSTOM_NAME || type == DataComponents.CUSTOM_DATA) continue;
+                types.add(type);
+            }
+            variantComponentTypes = List.copyOf(types);
+        }
+        return variantComponentTypes;
+    }
+
+    private static <T> void copyComponent(Mob from, Mob to, DataComponentType<T> type) {
+        T value = from.get(type);
+        if (value != null) to.setComponent(type, value);
+    }
+
+    // ── Spawning copies ───────────────────────────────────────────────────────
+
+    /**
+     * Creates (but does not add to the world) a single mob of the same type as
+     * {@code source}, carrying over its variant/colour and sheared state, and
+     * placed randomly within {@code spread} blocks of it. The copy starts as a
+     * single, unstacked adult; callers adjust age and stack size as needed.
+     */
+    public static Mob createCopy(Mob source, ServerLevel level, double spread) {
+        if (!(source.getType().create(level, EntitySpawnReason.TRIGGERED) instanceof Mob copy)) {
+            return null;
+        }
+
+        for (DataComponentType<?> type : variantComponentTypes()) {
+            copyComponent(source, copy, type);
+        }
+        if (source instanceof Sheep srcSheep && copy instanceof Sheep copySheep) {
+            copySheep.setSheared(srcSheep.isSheared());
+        }
+
+        RandomSource rng = level.getRandom();
+        copy.snapTo(
+            source.getX() + (rng.nextDouble() - 0.5) * spread,
+            source.getY(),
+            source.getZ() + (rng.nextDouble() - 0.5) * spread,
+            source.getYRot(), 0f);
+        return copy;
     }
 
     // ── Spatial helpers ───────────────────────────────────────────────────────

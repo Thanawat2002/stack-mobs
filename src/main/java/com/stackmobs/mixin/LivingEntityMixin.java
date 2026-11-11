@@ -56,8 +56,10 @@ public abstract class LivingEntityMixin {
         int stackSize = sm.stackmobs$getStackSize();
         if (stackSize <= 1) return; // single mob — vanilla handles everything
 
+        // Runs even when stacking is disabled: otherwise one kill would wipe
+        // out an entire existing stack with only a single mob's drops.
         StackManager manager = StackManager.getInstance();
-        if (manager == null || !manager.getConfig().enabled) return;
+        if (manager == null) return;
 
         float currentHealth = self.getHealth();
         float maxHealth     = self.getMaxHealth();
@@ -102,6 +104,7 @@ public abstract class LivingEntityMixin {
             self.setCustomName(null);
             self.setCustomNameVisible(false);
         }
+        manager.syncRegistry(mob, level);
 
         self.setHealth(survivorHealth);
         ci.cancel(); // prevent vanilla from zeroing out health

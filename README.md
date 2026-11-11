@@ -19,6 +19,8 @@ entities to improve server performance and enhance gameplay.
 | Admin commands | `/stackmob reload/toggle/info/unstack/killall/debug` |
 | Config hot-reload | Change settings without restarting the server |
 | Boss protection | Wither, Ender Dragon, Elder Guardian, Warden never stack |
+| Player-mob protection | Named, leashed, tamed, ridden and trading/inventory mobs (e.g. villagers) never stack |
+| Variant-aware | Only identical variants merge (sheep colour, cow/pig/chicken variant); split-off mobs keep them |
 | Developer API | `StackMobAPI.INSTANCE` for third-party mod integration |
 
 ---
@@ -121,7 +123,7 @@ All commands require operator level 2.
 | Command | Description |
 |---|---|
 | `/stackmob reload` | Reload config from disk |
-| `/stackmob toggle` | Enable / disable stacking |
+| `/stackmob toggle` | Enable / disable merging of new stacks (existing stacks keep working) |
 | `/stackmob info` | Show current config and stats |
 | `/stackmob unstack [radius]` | Split stacked mobs near you (default 32 blocks) |
 | `/stackmob killall` | Kill every stacked mob across all dimensions |

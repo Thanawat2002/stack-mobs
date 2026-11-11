@@ -8,7 +8,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AgeableMob;
-import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.EntityTypeTest;
@@ -46,7 +45,9 @@ public class StackManager {
     // ── Tick entry-point ──────────────────────────────────────────────────────
 
     public void onServerTick(MinecraftServer server) {
-        if (!config.enabled) return;
+        // Existing stacks keep working while stacking is disabled; only new
+        // merges stop. Otherwise babies in a stack would freeze and then all
+        // grow up at once.
 
         // Virtual-age processing runs every tick so babies grow at the
         // correct vanilla rate (1 tick = 1 age unit).
@@ -64,6 +65,8 @@ public class StackManager {
                 }
             }
         }
+
+        if (!config.enabled) return;
 
         tickCounter++;
         if (tickCounter < config.mergeDelay) return;
@@ -104,6 +107,8 @@ public class StackManager {
             for (int age : ages) {
                 int next = age + 1; // count up toward 0
                 if (next >= 0) {
+                    // Never grow more babies than the stack still holds
+                    if (StackUtils.getStackSize(primary) <= 1) continue;
                     spawnAdult(level, primary);
                     StackUtils.setStackSize(primary,
                         StackUtils.getStackSize(primary) - 1, config);
@@ -158,16 +163,8 @@ public class StackManager {
      */
     public void spawnAdult(ServerLevel level, Mob babyEntity) {
         try {
-            Mob adult = (Mob) babyEntity.getType().create(level, EntitySpawnReason.TRIGGERED);
+            Mob adult = StackUtils.createCopy(babyEntity, level, 1.5);
             if (adult == null) return;
-
-            java.util.Random rng = new java.util.Random();
-            double offsetX = (rng.nextDouble() - 0.5) * 1.5;
-            double offsetZ = (rng.nextDouble() - 0.5) * 1.5;
-            adult.setPos(
-                babyEntity.getX() + offsetX,
-                babyEntity.getY(),
-                babyEntity.getZ() + offsetZ);
 
             // Ensure the spawned entity is an adult (age 0)
             if (adult instanceof AgeableMob ageableMob) {
@@ -273,24 +270,21 @@ public class StackManager {
         int stackSize = StackUtils.getStackSize(entity);
         if (stackSize <= 1) return;
 
-        // Clear virtual ages before splitting so each clone starts fresh
+        // Each virtual baby becomes its own entity with its own remaining age
+        int[] virtualAges = ((StackedMob) entity).stackmobs$getVirtualAges();
         ((StackedMob) entity).stackmobs$setVirtualAges(new int[0]);
         StackUtils.setStackSize(entity, 1, config);
         activeStacks.remove(entity.getUUID());
 
-        Random rng = new Random();
         for (int i = 1; i < stackSize; i++) {
             try {
-                Mob clone = (Mob) entity.getType().create(level, EntitySpawnReason.TRIGGERED);
+                Mob clone = StackUtils.createCopy(entity, level, 2.0);
                 if (clone == null) continue;
-
-                double offsetX = (rng.nextDouble() - 0.5) * 2.0;
-                double offsetZ = (rng.nextDouble() - 0.5) * 2.0;
-                clone.setPos(entity.getX() + offsetX, entity.getY(), entity.getZ() + offsetZ);
 
                 // If source was a baby, clone should also be a baby
                 if (entity.isBaby() && clone instanceof AgeableMob ageableClone) {
-                    ageableClone.setAge(-24000);
+                    int age = (i - 1 < virtualAges.length) ? virtualAges[i - 1] : -24000;
+                    ageableClone.setAge(Math.min(age, -1));
                 }
 
                 StackUtils.setStackSize(clone, 1, config);
@@ -313,10 +307,13 @@ public class StackManager {
             StackMobsMod.LOGGER.warn("[StackMobs] Could not invoke dropAllDeathLoot for {}: {}",
                 StackUtils.getEntityId(entity), e.getMessage());
         }
+        // Registry is updated by the caller once the new stack size is known
+    }
 
-        int newSize = StackUtils.getStackSize(entity);
-        if (newSize > 1) registerStack(entity, level);
-        else             activeStacks.remove(entity.getUUID());
+    /** Re-registers or drops {@code entity} to match its current stack size. */
+    public void syncRegistry(Mob entity, Level level) {
+        if (StackUtils.getStackSize(entity) > 1) registerStack(entity, level);
+        else                                     activeStacks.remove(entity.getUUID());
     }
 
     // ── Registry ──────────────────────────────────────────────────────────────

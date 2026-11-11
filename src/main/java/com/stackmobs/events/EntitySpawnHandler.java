@@ -24,9 +24,10 @@ public class EntitySpawnHandler implements ServerEntityEvents.Load {
 
     @Override
     public void onLoad(Entity entity, ServerLevel level) {
-        if (!configManager.getConfig().enabled)       return;
+        // Register every existing stack, even when stacking is disabled or the
+        // mob no longer passes the filters: the registry drives baby growth and
+        // name tags, which existing stacks need regardless.
         if (!(entity instanceof Mob mob))              return;
-        if (!StackUtils.isStackable(mob, configManager.getConfig())) return;
 
         int stackSize = StackUtils.getStackSize(mob);
         if (stackSize > 1) {

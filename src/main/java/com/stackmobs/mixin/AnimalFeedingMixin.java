@@ -7,7 +7,6 @@ import com.stackmobs.stacking.StackUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
@@ -19,7 +18,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.Random;
 
 /**
  * Handles feeding interactions for stacked animals.
@@ -61,8 +59,9 @@ public abstract class AnimalFeedingMixin {
         Animal self = (Animal) (Object) this;
         if (!(self.level() instanceof ServerLevel serverLevel)) return;
 
+        // Existing stacks keep stack-aware feeding while stacking is disabled
         StackManager manager = StackManager.getInstance();
-        if (manager == null || !manager.getConfig().enabled) return;
+        if (manager == null) return;
 
         int stackSize = StackUtils.getStackSize(self);
         if (stackSize < 2) return;
@@ -135,13 +134,10 @@ public abstract class AnimalFeedingMixin {
                                                    int unfedCount,
                                                    StackManager manager) {
         try {
-            Mob unfed = (Mob) primary.getType().create(level, EntitySpawnReason.TRIGGERED);
+            // Keeps colour/variant and sheared state, so feeding a sheared
+            // stack can't produce freshly woolly sheep
+            Mob unfed = StackUtils.createCopy(primary, level, 2.0);
             if (unfed == null) return;
-
-            Random rng = new Random();
-            double ox = (rng.nextDouble() - 0.5) * 2.0;
-            double oz = (rng.nextDouble() - 0.5) * 2.0;
-            unfed.setPos(primary.getX() + ox, primary.getY(), primary.getZ() + oz);
 
             StackUtils.setStackSize(unfed, unfedCount, manager.getConfig());
             level.addFreshEntity(unfed);
@@ -173,7 +169,7 @@ public abstract class AnimalFeedingMixin {
         if (!self.isBaby()) return;
 
         StackManager manager = StackManager.getInstance();
-        if (manager == null || !manager.getConfig().enabled) return;
+        if (manager == null) return;
 
         int stackSize = StackUtils.getStackSize(self);
         if (stackSize < 2) return;

@@ -63,9 +63,10 @@ public abstract class AgeableMobMixin {
         if (!(self instanceof Mob mob)) return;
         if (!(self.level() instanceof ServerLevel serverLevel)) return;
 
-        // Guard: mod must be active
+        // Guard: mod must be loaded. Runs even when stacking is disabled, or
+        // the whole baby stack would grow up at once.
         StackManager manager = StackManager.getInstance();
-        if (manager == null || !manager.getConfig().enabled) return;
+        if (manager == null) return;
 
         // Guard: only handle stacked entities
         int stackSize = StackUtils.getStackSize(mob);

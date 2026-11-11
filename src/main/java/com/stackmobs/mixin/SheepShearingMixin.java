@@ -7,7 +7,6 @@ import com.stackmobs.stacking.StackUtils;
 import com.stackmobs.stacking.StackedMob;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.DyeColor;
@@ -85,8 +84,10 @@ public class SheepShearingMixin {
         if (!self.isSheared()) return;             // shearing didn't actually happen
         if (!(self instanceof StackedMob sm)) return;
 
+        // Vanilla has already sheared the primary; the stack must be split
+        // even while stacking is disabled or the whole stack counts as sheared.
         StackManager manager = StackManager.getInstance();
-        if (manager == null || !manager.getConfig().enabled) return;
+        if (manager == null) return;
 
         ModConfig config    = manager.getConfig();
         int stackSize       = stackmobs_stackSizeAtShear;
@@ -135,14 +136,8 @@ public class SheepShearingMixin {
         int remaining = stackSize - sheepToShear;
         if (remaining > 0) {
             try {
-                Sheep unsheared = new Sheep(EntityTypes.SHEEP, level);
-
-                Random rng = new Random();
-                double ox = (rng.nextDouble() - 0.5) * 1.0;
-                double oz = (rng.nextDouble() - 0.5) * 1.0;
-                unsheared.setPos(self.getX() + ox, self.getY(), self.getZ() + oz);
-                unsheared.setColor(self.getColor());
-                // isSheared() defaults to false
+                if (!(StackUtils.createCopy(self, level, 1.0) instanceof Sheep unsheared)) return;
+                unsheared.setSheared(false); // copy inherits the primary's new sheared state
 
                 level.addFreshEntity(unsheared);
                 StackUtils.setStackSize(unsheared, remaining, config);

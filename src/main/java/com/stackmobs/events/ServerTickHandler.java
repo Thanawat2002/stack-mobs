@@ -21,7 +21,7 @@ public class ServerTickHandler implements ServerTickEvents.EndTick {
 
     @Override
     public void onEndTick(MinecraftServer server) {
-        if (!configManager.getConfig().enabled) return;
+        // StackManager decides what still runs while stacking is disabled
         stackManager.onServerTick(server);
     }
 }

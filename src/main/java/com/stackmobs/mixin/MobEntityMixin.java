@@ -11,6 +11,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.Arrays;
+
 /**
  * Injects stack-size and virtual-ages fields into every {@link Mob} subclass
  * and implements the {@link StackedMob} interface.
@@ -26,7 +28,17 @@ public abstract class MobEntityMixin implements StackedMob {
     // ── StackedMob ────────────────────────────────────────────────────────────
 
     @Override public int   stackmobs$getStackSize()       { return stackmobs_stackSize; }
-    @Override public void  stackmobs$setStackSize(int s)  { stackmobs_stackSize = Math.max(1, s); }
+    @Override
+    public void stackmobs$setStackSize(int s) {
+        stackmobs_stackSize = Math.max(1, s);
+        // A stack of N babies is the primary plus N-1 virtual babies. When the
+        // stack shrinks (deaths, splits), drop the surplus ages so dead babies
+        // can't later "grow up" into new adults.
+        int maxVirtual = stackmobs_stackSize - 1;
+        if (stackmobs_virtualAges.length > maxVirtual) {
+            stackmobs_virtualAges = Arrays.copyOf(stackmobs_virtualAges, maxVirtual);
+        }
+    }
 
     @Override
     public int[] stackmobs$getVirtualAges() {
