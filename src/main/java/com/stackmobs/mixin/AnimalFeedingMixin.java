@@ -99,8 +99,9 @@ public abstract class AnimalFeedingMixin {
         }
 
         // ── Primary entity = fed group (gets cooldown + breeds) ───────────────
-        StackUtils.setStackSize(self, fedCount, manager.getConfig());
+        // Cooldown first, so the rebuilt name tag shows the ♥ "fed" prefix
         ((StackedMob) self).stackmobs$setBreedCooldownUntil(gameTime + BREED_COOLDOWN_TICKS);
+        StackUtils.setStackSize(self, fedCount, manager.getConfig());
 
         // Hearts appear immediately, breeding deferred one tick so animation shows
         setInLove(player);

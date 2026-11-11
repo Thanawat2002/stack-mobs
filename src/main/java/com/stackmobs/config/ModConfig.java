@@ -49,8 +49,8 @@ public class ModConfig {
     public boolean showHealthBar   = Constants.DEFAULT_SHOW_HEALTH_BAR;
 
     /**
-     * Maximum distance in blocks at which a stacked mob's name tag is visible.
-     * Players farther away than this will not see the floating name.
+     * The floating name tag is shown while at least one player is within this
+     * many blocks of the stack (then everyone who can see the mob sees it).
      * Set to {@code 0} to always show (vanilla behaviour).
      */
     public int nameTagViewDistance = Constants.DEFAULT_NAMETAG_VIEW_DISTANCE;
@@ -107,6 +107,47 @@ public class ModConfig {
      * Empty = no biome restrictions.
      */
     public List<String> disabledBiomes = new ArrayList<>();
+
+    // ── Validation ────────────────────────────────────────────────────────────
+
+    /**
+     * Clamps out-of-range values and replaces missing ({@code null}) lists so
+     * a hand-edited file can't break stacking.
+     *
+     * @return a description of every value that was corrected (empty if none)
+     */
+    public List<String> validate() {
+        List<String> fixes = new ArrayList<>();
+        if (stackRadius < 1) {
+            fixes.add("stackRadius " + stackRadius + " < 1, using 1");
+            stackRadius = 1;
+        }
+        if (maxStackSize < 2) {
+            fixes.add("maxStackSize " + maxStackSize + " < 2, using 2");
+            maxStackSize = 2;
+        }
+        if (minStackSize < 2) {
+            fixes.add("minStackSize " + minStackSize + " < 2, using 2");
+            minStackSize = 2;
+        }
+        if (minStackSize > maxStackSize) {
+            fixes.add("minStackSize " + minStackSize + " > maxStackSize, using " + maxStackSize);
+            minStackSize = maxStackSize;
+        }
+        if (mergeDelay < 1) {
+            fixes.add("mergeDelay " + mergeDelay + " < 1, using 1");
+            mergeDelay = 1;
+        }
+        if (nameTagViewDistance < 0) {
+            fixes.add("nameTagViewDistance " + nameTagViewDistance + " < 0, using 0");
+            nameTagViewDistance = 0;
+        }
+        if (blacklist == null)      { blacklist = new ArrayList<>();      fixes.add("blacklist missing, using []"); }
+        if (whitelist == null)      { whitelist = new ArrayList<>();      fixes.add("whitelist missing, using []"); }
+        if (enabledWorlds == null)  { enabledWorlds = new ArrayList<>();  fixes.add("enabledWorlds missing, using []"); }
+        if (disabledBiomes == null) { disabledBiomes = new ArrayList<>(); fixes.add("disabledBiomes missing, using []"); }
+        return fixes;
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

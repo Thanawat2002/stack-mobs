@@ -87,15 +87,24 @@ File: `config/stackmobs.json`
 {
   "enabled": true,
   "stackRadius": 8,
-  "maxStackSize": 100,
-  "mergeDelay": 40,
+  "maxStackSize": 1000,
+  "minStackSize": 10,
+  "mergeDelay": 100,
   "showNameTag": true,
   "showHealthBar": false,
+  "nameTagViewDistance": 8,
+  "useBlacklist": true,
   "blacklist": [
     "minecraft:wither",
     "minecraft:ender_dragon"
   ],
-  "whitelist": [],
+  "useWhitelist": true,
+  "whitelist": [
+    "minecraft:chicken",
+    "minecraft:cow",
+    "minecraft:pig",
+    "minecraft:sheep"
+  ],
   "enabledWorlds": [],
   "disabledBiomes": []
 }
@@ -103,16 +112,27 @@ File: `config/stackmobs.json`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | bool | `true` | Master on/off switch |
+| `enabled` | bool | `true` | Merge new stacks. When `false`, existing stacks keep working but nothing new merges |
 | `stackRadius` | int | `8` | Merge radius in blocks |
-| `maxStackSize` | int | `100` | Max entities per stack |
-| `mergeDelay` | int | `40` | Ticks between scans (20 ticks = 1 s) |
+| `maxStackSize` | int | `1000` | Max entities per stack |
+| `minStackSize` | int | `10` | Identical mobs needed within `stackRadius` before a new stack forms (min 2) |
+| `mergeDelay` | int | `100` | Ticks between merge scans (20 ticks = 1 s) |
 | `showNameTag` | bool | `true` | Show *Mob xN* label |
 | `showHealthBar` | bool | `false` | Append health % to label |
-| `blacklist` | list | *(bosses)* | Entity IDs never to stack |
-| `whitelist` | list | *(empty)* | When non-empty, only these IDs stack |
-| `enabledWorlds` | list | *(empty = all)* | Dimensions where stacking is active |
-| `disabledBiomes` | list | *(empty)* | Biomes where stacking is suppressed |
+| `nameTagViewDistance` | int | `8` | Show the label while any player is within this many blocks (`0` = always). Visibility is per mob, so everyone sees it once one player is close |
+| `useBlacklist` | bool | `true` | Apply `blacklist` (bosses are always excluded) |
+| `blacklist` | list | *(wither, ender dragon)* | Entity IDs never to stack |
+| `useWhitelist` | bool | `true` | When `true`, only `whitelist` IDs stack |
+| `whitelist` | list | *(chicken, cow, pig, sheep)* | Entity IDs allowed to stack while `useWhitelist` is on |
+| `enabledWorlds` | list | *(empty = all)* | Dimensions where new stacks may form, e.g. `minecraft:overworld` |
+| `disabledBiomes` | list | *(empty)* | Biomes where new stacks don't form, e.g. `minecraft:plains` |
+
+> **Default is farm animals only.** To stack hostile mobs too, set
+> `"useWhitelist": false` (or add their IDs to `whitelist`).
+
+Out-of-range values are corrected on load with a warning in the log. If the
+file has invalid JSON, the mod logs the error, keeps its current settings and
+leaves the file untouched — fix it and run `/stackmob reload`.
 
 ---
 
@@ -145,12 +165,15 @@ int size = StackMobAPI.INSTANCE.getStackSize(entity);
 // Force stack size (updates name tag automatically)
 StackMobAPI.INSTANCE.setStackSize(entity, 25);
 
-// Merge two compatible mobs
+// Merge source into target. No-op unless they're the same type and variant
+// and the combined size fits within maxStackSize
 StackMobAPI.INSTANCE.merge(source, target);
 
-// Split a stacked mob
+// Split 5 members off as individual mobs; the rest stays stacked
 StackMobAPI.INSTANCE.split(entity, 5);
 ```
+
+Mutating calls only run on the server side.
 
 Declare the dependency in `fabric.mod.json`:
 
@@ -177,8 +200,12 @@ StackMobsMod          ModInitializer entry-point; wires all components.
 │   └── StackCommand  All /stackmob sub-commands via Brigadier.
 ├── Mixins
 │   ├── MobEntityMixin          Injects stackSize field + NBT persistence.
-│   ├── LivingEntityMixin       Intercepts fatal damage for stacked mobs.
-│   └── LivingEntityDropAccessor Makes protected drop() callable externally.
+│   ├── LivingEntityMixin       Spreads fatal damage across stack members.
+│   ├── LivingEntityDropAccessor Makes protected drop() callable externally.
+│   ├── AgeableMobMixin         Grows babies in a stack up one at a time.
+│   ├── AnimalFeedingMixin      Stack-aware breeding and baby feeding.
+│   ├── SheepShearingMixin      Batch shearing; sheared sheep split off.
+│   └── ChickenEggMixin         Lays eggs for every chicken in a stack.
 ├── Rendering
 │   └── NameTagRenderer  Builds formatted Text for custom name tags.
 └── API
@@ -233,8 +260,10 @@ fires, the egg loot table is rolled once per stacked chicken, so egg output
 matches the same number of vanilla chickens.
 
 ### Unstacking
-Use `/stackmob unstack` or `StackMobAPI.INSTANCE.split()` to spawn all
-members as individual entities around the primary's position.
+Use `/stackmob unstack` to split every stack near you into individual mobs,
+or `StackMobAPI.INSTANCE.split(entity, n)` to split off `n` members. Split-off
+mobs keep their colour/variant, sheared state, breeding cooldown and, for
+babies, their own remaining growth time.
 
 ---
 

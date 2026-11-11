@@ -2,6 +2,7 @@ package com.stackmobs.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.stackmobs.StackMobsMod;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -49,23 +50,45 @@ public class ConfigManager {
      * Creates a default config file if none exists.
      */
     public void load() {
+        String error = tryLoad();
+        if (error != null) {
+            StackMobsMod.LOGGER.error("[StackMobs] {} Keeping the current settings.", error);
+        }
+    }
+
+    /**
+     * Reads and validates the config file. On failure (unreadable file or
+     * malformed JSON) the current settings are kept and the file is left
+     * untouched, so a typo can't crash the server or wipe the user's config.
+     *
+     * @return {@code null} on success, otherwise a description of the problem
+     */
+    private String tryLoad() {
         if (!Files.exists(configPath)) {
             StackMobsMod.LOGGER.info("[StackMobs] No config found – writing defaults to {}", configPath);
             save();
-            return;
+            return null;
         }
 
+        ModConfig loaded;
         try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
-            ModConfig loaded = gson.fromJson(reader, ModConfig.class);
-            if (loaded != null) {
-                config = loaded;
-                StackMobsMod.LOGGER.info("[StackMobs] Configuration loaded from {}", configPath);
-            } else {
-                StackMobsMod.LOGGER.warn("[StackMobs] Config file is empty – using defaults.");
-            }
+            loaded = gson.fromJson(reader, ModConfig.class);
         } catch (IOException e) {
-            StackMobsMod.LOGGER.error("[StackMobs] Failed to read config: {}", e.getMessage());
+            return "Failed to read " + configPath + ": " + e.getMessage();
+        } catch (JsonParseException e) {
+            return "Invalid JSON in " + configPath + ": " + e.getMessage();
         }
+
+        if (loaded == null) {
+            StackMobsMod.LOGGER.warn("[StackMobs] Config file is empty – using defaults.");
+            loaded = new ModConfig();
+        }
+        for (String fix : loaded.validate()) {
+            StackMobsMod.LOGGER.warn("[StackMobs] Config: {}", fix);
+        }
+        config = loaded;
+        StackMobsMod.LOGGER.info("[StackMobs] Configuration loaded from {}", configPath);
+        return null;
     }
 
     /**
@@ -84,18 +107,12 @@ public class ConfigManager {
     }
 
     /**
-     * Reloads the config from disk and returns a result message suitable for
-     * displaying to a command sender.
+     * Reloads the config from disk. On failure the current settings stay active.
      *
-     * @return human-readable result string
+     * @return {@code null} on success, otherwise a human-readable error
      */
     public String reload() {
-        try {
-            load();
-            return "Configuration reloaded successfully.";
-        } catch (Exception e) {
-            return "Reload failed: " + e.getMessage();
-        }
+        return tryLoad();
     }
 
     /** @return the currently active configuration object */

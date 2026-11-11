@@ -50,6 +50,7 @@ public final class StackUtils {
         if (!config.isWhitelisted(id)) return false;
 
         if (isPlayerManaged(entity))   return false;
+        if (!isLocationAllowed(entity, config)) return false;
 
         // Sheared sheep stay single so each regrows its own wool by eating
         // grass; they rejoin a stack once their wool is back.
@@ -63,6 +64,25 @@ public final class StackUtils {
      * secondary entity, which would delete its name, lead, owner, saddle,
      * inventory or trades.
      */
+    /**
+     * Applies {@code enabledWorlds} (empty = every dimension) and
+     * {@code disabledBiomes}. Only new merges are affected; existing stacks
+     * keep working wherever they are.
+     */
+    public static boolean isLocationAllowed(Mob entity, ModConfig config) {
+        if (config.enabledWorlds != null && !config.enabledWorlds.isEmpty()) {
+            String world = entity.level().dimension().identifier().toString();
+            if (config.enabledWorlds.stream().noneMatch(world::equalsIgnoreCase)) return false;
+        }
+        if (config.disabledBiomes != null && !config.disabledBiomes.isEmpty()) {
+            String biome = entity.level().getBiome(entity.blockPosition()).unwrapKey()
+                .map(key -> key.identifier().toString())
+                .orElse("");
+            if (config.disabledBiomes.stream().anyMatch(biome::equalsIgnoreCase)) return false;
+        }
+        return true;
+    }
+
     public static boolean isPlayerManaged(Mob entity) {
         // Name tags and picked-up items both set persistence
         if (entity.isPersistenceRequired())                       return true;

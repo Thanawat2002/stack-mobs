@@ -116,14 +116,11 @@ public class SheepShearingMixin {
                 level.addFreshEntity(drop);
             }
 
-            // Damage shears (vanilla already spent 1 durability on the first sheep)
-            int newDamage = shears.getDamageValue() + extraShears;
-            if (!shears.isEmpty()) {
-                if (newDamage >= shears.getMaxDamage()) {
-                    shears.shrink(1); // shears break
-                } else {
-                    shears.setDamageValue(newDamage);
-                }
+            // Damage shears for the extra sheep (the caller damages them by 1 for
+            // the first sheep after shear() returns). hurtAndBreak applies
+            // Unbreaking and breaks the shears when they run out.
+            if (!shears.isEmpty() && shears.isDamageableItem()) {
+                shears.hurtAndBreak(extraShears, level, null, item -> {});
             }
         }
 

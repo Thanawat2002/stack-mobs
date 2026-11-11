@@ -4,6 +4,7 @@ import com.stackmobs.StackMobsMod;
 import com.stackmobs.config.ModConfig;
 import com.stackmobs.mixin.LivingEntityDropAccessor;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
@@ -55,10 +56,11 @@ public class StackManager {
             processVirtualAges(level);
         }
 
-        // Name-tag visibility update (every NAMETAG_UPDATE_INTERVAL ticks)
+        // Name-tag text + visibility update (every NAMETAG_UPDATE_INTERVAL ticks)
         nameTagCounter++;
         if (nameTagCounter >= NAMETAG_UPDATE_INTERVAL) {
             nameTagCounter = 0;
+            refreshNameTags();
             if (config.showNameTag && config.nameTagViewDistance > 0) {
                 for (ServerLevel level : server.getAllLevels()) {
                     updateNameTagVisibility(level);
@@ -137,6 +139,31 @@ public class StackManager {
      * Updates the custom-name visibility of every stacked mob in the given level
      * based on player proximity. The name tag is shown only when at least one
      * player is within {@link ModConfig#nameTagViewDistance} blocks.
+     */
+    /**
+     * Rebuilds each stack's label when its text would change: the health %
+     * after non-lethal hits, and the ♥ prefix when a breed cooldown expires.
+     * Only sends an update when the text actually differs.
+     */
+    private void refreshNameTags() {
+        for (MobStack stack : activeStacks.values()) {
+            if (!stack.isValid()) continue;
+            Mob mob = stack.getPrimary();
+            int size = StackUtils.getStackSize(mob);
+            if (size < 2) continue;
+
+            Component expected = StackUtils.buildNameTag(mob, size, config.showHealthBar);
+            if (!expected.equals(mob.getCustomName())) {
+                mob.setCustomName(expected);
+            }
+        }
+    }
+
+    /**
+     * Shows a stack's label while any player is within
+     * {@link ModConfig#nameTagViewDistance} blocks. Name-tag visibility is a
+     * property of the entity, not of each viewer, so once one player is close
+     * every player who can see the mob sees the label.
      */
     private void updateNameTagVisibility(ServerLevel level) {
         if (!config.showNameTag) return;
@@ -264,26 +291,38 @@ public class StackManager {
 
     // ── Unstack (split) ───────────────────────────────────────────────────────
 
+    /** Splits the whole stack into individual mobs. */
     public void unstack(Mob entity) {
+        split(entity, StackUtils.getStackSize(entity) - 1);
+    }
+
+    /**
+     * Splits {@code amount} members off the stack as individual mobs (clamped
+     * to stack size - 1); the rest stays as the stack.
+     */
+    public void split(Mob entity, int amount) {
         if (!(entity.level() instanceof ServerLevel level)) return;
 
         int stackSize = StackUtils.getStackSize(entity);
-        if (stackSize <= 1) return;
+        amount = Math.min(amount, stackSize - 1);
+        if (amount <= 0) return;
 
-        // Each virtual baby becomes its own entity with its own remaining age
+        // Split-off babies take the last virtual ages; the stack keeps the rest
         int[] virtualAges = ((StackedMob) entity).stackmobs$getVirtualAges();
-        ((StackedMob) entity).stackmobs$setVirtualAges(new int[0]);
-        StackUtils.setStackSize(entity, 1, config);
-        activeStacks.remove(entity.getUUID());
+        int keep = Math.max(0, virtualAges.length - amount);
+        int[] splitAges = Arrays.copyOfRange(virtualAges, keep, virtualAges.length);
+        ((StackedMob) entity).stackmobs$setVirtualAges(Arrays.copyOf(virtualAges, keep));
+        StackUtils.setStackSize(entity, stackSize - amount, config);
+        syncRegistry(entity, level);
 
-        for (int i = 1; i < stackSize; i++) {
+        for (int i = 0; i < amount; i++) {
             try {
                 Mob clone = StackUtils.createCopy(entity, level, 2.0);
                 if (clone == null) continue;
 
                 // If source was a baby, clone should also be a baby
                 if (entity.isBaby() && clone instanceof AgeableMob ageableClone) {
-                    int age = (i - 1 < virtualAges.length) ? virtualAges[i - 1] : -24000;
+                    int age = (i < splitAges.length) ? splitAges[i] : -24000;
                     ageableClone.setAge(Math.min(age, -1));
                 }
 
@@ -330,10 +369,16 @@ public class StackManager {
     public void updateConfig(ModConfig cfg)                    { this.config = cfg; }
     public void clearRegistry()                                { activeStacks.clear(); }
 
+    /** Stacks whose primary is loaded and alive (unloaded chunks excluded). */
+    public int getActiveStackCount() {
+        return (int) activeStacks.values().stream().filter(MobStack::isValid).count();
+    }
+
     public int getTotalEntitiesSaved() {
+        // Live size from the entity, not the registry snapshot
         return activeStacks.values().stream()
             .filter(MobStack::isValid)
-            .mapToInt(s -> s.getStackSize() - 1)
+            .mapToInt(s -> StackUtils.getStackSize(s.getPrimary()) - 1)
             .sum();
     }
 

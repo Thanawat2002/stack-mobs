@@ -68,9 +68,14 @@ public final class StackCommand {
     private static int executeReload(CommandContext<CommandSourceStack> ctx,
                                      ConfigManager configManager,
                                      StackManager  stackManager) {
-        String result = configManager.reload();
+        String error = configManager.reload();
+        if (error != null) {
+            ctx.getSource().sendFailure(Component.literal(
+                "§c[StackMobs] Reload failed, keeping current settings. " + error));
+            return 0;
+        }
         stackManager.updateConfig(configManager.getConfig());
-        sendSuccess(ctx, result);
+        sendSuccess(ctx, "Configuration reloaded successfully.");
         StackMobsMod.LOGGER.info("[StackMobs] Config reloaded by {}.", ctx.getSource().getTextName());
         return 1;
     }
@@ -96,7 +101,7 @@ public final class StackCommand {
                                    ConfigManager configManager,
                                    StackManager  stackManager) {
         var cfg   = configManager.getConfig();
-        int stacks = stackManager.getActiveStacks().size();
+        int stacks = stackManager.getActiveStackCount();
         int saved  = stackManager.getTotalEntitiesSaved();
 
         CommandSourceStack src = ctx.getSource();
@@ -197,7 +202,7 @@ public final class StackCommand {
         });
 
         src.sendSuccess(() ->
-            Component.literal("Total: " + stacks.size() + " stacks | " +
+            Component.literal("Total: " + stackManager.getActiveStackCount() + " stacks | " +
                               stackManager.getTotalEntitiesSaved() + " entities saved")
                 .withStyle(ChatFormatting.YELLOW), false);
         return stacks.size();
