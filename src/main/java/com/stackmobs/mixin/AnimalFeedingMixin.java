@@ -7,6 +7,7 @@ import com.stackmobs.stacking.StackUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
@@ -29,8 +30,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Each baby requires 2 food (1 per virtual parent), mirroring vanilla.
  *
  * <h3>Baby animals (growth)</h3>
- * <p>Vanilla handles the first item; extra items are consumed proportionally
- * and applied as additional {@code ageUp} ticks.
+ * <p>Vanilla feeds the primary with the first item; each further item feeds
+ * one virtual baby, applying vanilla's speed-up to that baby's own age.
  */
 @Mixin(Animal.class)
 public abstract class AnimalFeedingMixin {
@@ -175,14 +176,25 @@ public abstract class AnimalFeedingMixin {
         if (stackSize < 2) return;
 
         ItemStack heldItem = player.getItemInHand(hand);
-        if (heldItem.isEmpty()) return;
+        if (heldItem.isEmpty() || !isFood(heldItem)) return;
 
-        int extra = Math.min(stackSize - 1, heldItem.getCount());
-        heldItem.shrink(extra);
-        self.ageUp(extra * 10);
+        // Vanilla already fed the primary. Feed the virtual babies one item
+        // each, applying vanilla's speed-up (10% of the remaining time).
+        int[] ages = ((StackedMob) self).stackmobs$getVirtualAges();
+        boolean creative = player.getAbilities().instabuild;
+        int fed = creative ? ages.length : Math.min(ages.length, heldItem.getCount());
+        if (fed <= 0) return;
+
+        for (int i = 0; i < fed; i++) {
+            int speedUpTicks = AgeableMob.getSpeedUpSecondsWhenFeeding(-ages[i]) * 20;
+            // Reaching 0 grows the baby up on the next tick (processVirtualAges)
+            ages[i] = Math.min(0, ages[i] + speedUpTicks);
+        }
+        ((StackedMob) self).stackmobs$setVirtualAges(ages);
+        if (!creative) heldItem.shrink(fed);
 
         StackMobsMod.LOGGER.debug(
-            "[StackMobs] Baby {} (size {}): consumed {} extra food, ageUp +{} ticks.",
-            StackUtils.getEntityId(self), stackSize, extra, extra * 10);
+            "[StackMobs] Baby {} (size {}): fed {} virtual babies.",
+            StackUtils.getEntityId(self), stackSize, fed);
     }
 }

@@ -8,7 +8,8 @@
 		"LivingEntityMixin",
 		"LivingEntityDropAccessor",
 		"AnimalFeedingMixin",
-		"SheepShearingMixin"
+		"SheepShearingMixin",
+		"ChickenEggMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

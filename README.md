@@ -196,10 +196,13 @@ the primary entity's stack counter increases. Name tag and particles are
 updated immediately.
 
 ### Death
-When a stacked entity takes fatal damage:
-1. Stack size decreases by 1.
-2. Loot and XP drop as if one entity died (vanilla loot table, full XP).
-3. The entity restores to full health (representing the "next" mob).
+Damage is counted after armour, enchantments, Resistance and absorption,
+exactly as vanilla applies it. When that damage is fatal to a stacked entity:
+1. One member dies, plus one more for every full max-health of overflow damage
+   (a big hit can kill several members at once).
+2. Each dead member drops loot and XP as if one entity died (vanilla loot
+   table, full XP).
+3. The next member takes over with the leftover damage applied to its health.
 4. The name tag updates to the new count.
 
 When the last stack member dies (stack size = 1), vanilla death occurs
@@ -216,6 +219,18 @@ Shearing a sheep stack clips as many sheep as the shears have durability left.
 Each sheared sheep becomes its own entity and never stacks, so it regrows its
 wool by eating grass just like in vanilla. Once its wool is back, it rejoins a
 nearby stack on the next merge scan. The un-sheared remainder stays a stack.
+
+### Feeding
+- **Adults:** one stack click breeds as many pairs as the held food allows
+  (2 food per baby). The fed group keeps a 5-minute breeding cooldown; the
+  unfed rest splits off as its own stack.
+- **Babies:** each food item feeds one baby in the stack, speeding up that
+  baby's growth by vanilla's amount (10% of its remaining time).
+
+### Chicken eggs
+A chicken stack lays eggs for every chicken in it: each time its egg timer
+fires, the egg loot table is rolled once per stacked chicken, so egg output
+matches the same number of vanilla chickens.
 
 ### Unstacking
 Use `/stackmob unstack` or `StackMobAPI.INSTANCE.split()` to spawn all

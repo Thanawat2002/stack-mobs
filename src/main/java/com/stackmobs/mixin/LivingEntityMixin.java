@@ -1,5 +1,8 @@
 package com.stackmobs.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.stackmobs.stacking.StackManager;
 import com.stackmobs.stacking.StackUtils;
 import com.stackmobs.stacking.StackedMob;
@@ -16,21 +19,23 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Spreads incoming damage across the virtual mobs in a stack.
  *
- * <p>Injected at HEAD of {@code actuallyHurt} (post-armor, post-enchantment
- * damage) so every hit — regardless of size — correctly kills as many virtual
- * members as the damage warrants.
+ * <p>Wraps the {@code setHealth} call inside {@code actuallyHurt}, which
+ * vanilla makes only after armour, enchantments, Resistance and absorption
+ * have reduced the damage. The new health it is about to set tells us the
+ * real damage dealt, so armoured mobs lose exactly as many members as a
+ * vanilla mob would lose health.
  *
  * <h3>Formula</h3>
  * <pre>
- *   overflow        = damage - primaryCurrentHP          (≥ 0 only if primary dies)
+ *   overflow        = -(new health)                   (≥ 0 only if primary dies)
  *   additionalKills = floor(overflow / maxHP)
  *   totalKills      = 1 + additionalKills
  *   survivorHP      = maxHP - (overflow mod maxHP)
  * </pre>
  *
- * <h3>Examples (mob maxHP = 10)</h3>
+ * <h3>Examples (mob maxHP = 10, damage after armour)</h3>
  * <pre>
- *   Hit 7,  HP 10/10 → 7 < 10: no kill, vanilla reduces HP to 3/10
+ *   Hit 7,  HP 10/10 → 7 < 10: no kill, HP 3/10
  *   Hit 8,  HP  3/10 → overflow 5:  kills 1, next at  5/10
  *   Hit 15, HP 10/10 → overflow 5:  kills 1, next at  5/10
  *   Hit 25, HP 10/10 → overflow 15: kills 2, next at  5/10
@@ -40,55 +45,77 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
 
+    // ── Removal damage (/kill, /stackmob killall, falling into the void) ──────
+
     @Inject(
         method = "actuallyHurt(Lnet/minecraft/server/level/ServerLevel;" +
                  "Lnet/minecraft/world/damagesource/DamageSource;F)V",
-        at = @At("HEAD"),
-        cancellable = true
+        at = @At("HEAD")
     )
-    private void stackmobs$spreadDamage(ServerLevel level,
-                                         DamageSource source,
-                                         float amount,
-                                         CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (!(self instanceof Mob mob))   return;
-        if (!(self instanceof StackedMob sm)) return;
-
-        int stackSize = sm.stackmobs$getStackSize();
-        if (stackSize <= 1) return; // single mob — vanilla handles everything
-
-        // Runs even when stacking is disabled: otherwise one kill would wipe
-        // out an entire existing stack with only a single mob's drops.
-        StackManager manager = StackManager.getInstance();
-        if (manager == null) return;
-
-        // ── Removal damage (/kill, /stackmob killall, falling into the void) ──
+    private void stackmobs$removeStackOnKill(ServerLevel level,
+                                             DamageSource source,
+                                             float amount,
+                                             CallbackInfo ci) {
         // Remove the whole stack with only the primary's vanilla drops. Running
         // the loot table once per member would flood the world with items and
         // lag the server (999 loot rolls for a 1000-stack), or drop them into
         // the void where nobody can collect them anyway.
-        if (source.is(DamageTypes.GENERIC_KILL) || source.is(DamageTypes.FELL_OUT_OF_WORLD)) {
-            sm.stackmobs$setStackSize(1);
-            self.setCustomName(null);
-            self.setCustomNameVisible(false);
-            manager.syncRegistry(mob, level);
-            return; // vanilla applies the damage and kills the primary
+        if (!source.is(DamageTypes.GENERIC_KILL) && !source.is(DamageTypes.FELL_OUT_OF_WORLD)) return;
+
+        LivingEntity self = (LivingEntity) (Object) this;
+        if (!(self instanceof Mob mob) || !(self instanceof StackedMob sm)) return;
+        if (sm.stackmobs$getStackSize() <= 1) return;
+
+        StackManager manager = StackManager.getInstance();
+        if (manager == null) return;
+
+        sm.stackmobs$setStackSize(1);
+        self.setCustomName(null);
+        self.setCustomNameVisible(false);
+        manager.syncRegistry(mob, level);
+        // vanilla applies the damage and kills the primary
+    }
+
+    // ── Damage spill ──────────────────────────────────────────────────────────
+
+    @WrapOperation(
+        method = "actuallyHurt(Lnet/minecraft/server/level/ServerLevel;" +
+                 "Lnet/minecraft/world/damagesource/DamageSource;F)V",
+        at = @At(value = "INVOKE",
+                 target = "Lnet/minecraft/world/entity/LivingEntity;setHealth(F)V")
+    )
+    private void stackmobs$spreadDamage(LivingEntity self,
+                                        float newHealth,
+                                        Operation<Void> setHealth,
+                                        @Local(argsOnly = true) ServerLevel level,
+                                        @Local(argsOnly = true) DamageSource source) {
+        // Hit doesn't kill the primary mob: vanilla reduces HP normally
+        if (newHealth > 0
+                || !(self instanceof Mob mob)
+                || !(self instanceof StackedMob sm)
+                || sm.stackmobs$getStackSize() <= 1) {
+            setHealth.call(self, newHealth);
+            return;
         }
 
-        float currentHealth = self.getHealth();
-        float maxHealth     = self.getMaxHealth();
+        // Runs even when stacking is disabled: otherwise one kill would wipe
+        // out an entire existing stack with only a single mob's drops.
+        StackManager manager = StackManager.getInstance();
+        if (manager == null) {
+            setHealth.call(self, newHealth);
+            return;
+        }
 
-        // ── Hit doesn't kill the primary mob ─────────────────────────────────
-        // Let vanilla reduce HP normally; no virtual mob dies.
-        if (amount < currentHealth) return;
+        int   stackSize = sm.stackmobs$getStackSize();
+        float maxHealth = self.getMaxHealth();
 
         // ── Calculate how many virtual mobs die ───────────────────────────────
-        float overflow      = amount - currentHealth;
+        float overflow      = -newHealth;
         int additionalKills = (int) Math.floor(overflow / maxHealth);
         int totalKills      = Math.min(1 + additionalKills, stackSize);
 
         // ── Entire stack wiped ────────────────────────────────────────────────
-        // Issue drops for all virtual members; let vanilla kill the primary entity.
+        // Issue drops for all virtual members; vanilla kills the primary entity.
         if (totalKills >= stackSize) {
             for (int i = 0; i < stackSize - 1; i++) {
                 manager.onStackMemberKilled(mob, level, source);
@@ -96,7 +123,8 @@ public abstract class LivingEntityMixin {
             sm.stackmobs$setStackSize(1);
             self.setCustomName(null);
             self.setCustomNameVisible(false);
-            return; // do NOT cancel → entity dies naturally
+            setHealth.call(self, newHealth);
+            return;
         }
 
         // ── Partial kill: some mobs survive ──────────────────────────────────
@@ -104,7 +132,7 @@ public abstract class LivingEntityMixin {
             manager.onStackMemberKilled(mob, level, source);
         }
 
-        int   newSize        = stackSize - totalKills;
+        int   newSize         = stackSize - totalKills;
         float damageRemainder = overflow % maxHealth;
         float survivorHealth  = Math.max(0.5f, maxHealth - damageRemainder);
 
@@ -120,7 +148,7 @@ public abstract class LivingEntityMixin {
         }
         manager.syncRegistry(mob, level);
 
-        self.setHealth(survivorHealth);
-        ci.cancel(); // prevent vanilla from zeroing out health
+        // The next member steps in with the leftover damage applied
+        setHealth.call(self, survivorHealth);
     }
 }
