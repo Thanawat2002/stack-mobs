@@ -5,6 +5,7 @@ import com.stackmobs.stacking.StackUtils;
 import com.stackmobs.stacking.StackedMob;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import org.spongepowered.asm.mixin.Mixin;
@@ -60,6 +61,19 @@ public abstract class LivingEntityMixin {
         // out an entire existing stack with only a single mob's drops.
         StackManager manager = StackManager.getInstance();
         if (manager == null) return;
+
+        // ── Removal damage (/kill, /stackmob killall, falling into the void) ──
+        // Remove the whole stack with only the primary's vanilla drops. Running
+        // the loot table once per member would flood the world with items and
+        // lag the server (999 loot rolls for a 1000-stack), or drop them into
+        // the void where nobody can collect them anyway.
+        if (source.is(DamageTypes.GENERIC_KILL) || source.is(DamageTypes.FELL_OUT_OF_WORLD)) {
+            sm.stackmobs$setStackSize(1);
+            self.setCustomName(null);
+            self.setCustomNameVisible(false);
+            manager.syncRegistry(mob, level);
+            return; // vanilla applies the damage and kills the primary
+        }
 
         float currentHealth = self.getHealth();
         float maxHealth     = self.getMaxHealth();

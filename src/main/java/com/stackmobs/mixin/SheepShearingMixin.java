@@ -7,6 +7,7 @@ import com.stackmobs.stacking.StackUtils;
 import com.stackmobs.stacking.StackedMob;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.DyeColor;
@@ -30,9 +31,10 @@ import java.util.Random;
  *   <li>Wool drops (1-3 per sheep) are spawned for every clipped sheep.</li>
  *   <li>Shears lose 1 durability per clipped sheep (vanilla already handles the
  *       first one; we apply the remainder manually).</li>
- *   <li>The sheared group stays on the primary entity; the un-sheared group
- *       is spawned as a separate entity so the two never re-stack until wool
- *       regrows.</li>
+ *   <li>Every sheared sheep becomes its own entity (the primary plus spawned
+ *       copies) so each regrows wool by eating grass, as in vanilla. Sheared
+ *       sheep never stack; they rejoin a stack once their wool is back.</li>
+ *   <li>The un-sheared remainder is spawned as a separate stack.</li>
  * </ul>
  */
 @Mixin(Sheep.class)
@@ -125,11 +127,24 @@ public class SheepShearingMixin {
             }
         }
 
-        // ── Update the primary entity (sheared group) ─────────────────────────
-        StackUtils.setStackSize(self, sheepToShear, config);
+        // ── Sheared sheep split into individual entities ──────────────────────
+        // A stack can only hold one sheared flag, so a sheared stack would
+        // regrow every sheep's wool the moment the primary eats grass. Each
+        // sheared sheep is therefore its own entity; sheared sheep never stack
+        // (see StackUtils.isStackable) and rejoin a stack once wool regrows.
+        StackUtils.setStackSize(self, 1, config);
         manager.removeStack(self.getUUID());
-        if (sheepToShear > 1) {
-            manager.registerStack(self, level);
+
+        for (int i = 1; i < sheepToShear; i++) {
+            try {
+                Mob sheared = StackUtils.createCopy(self, level, 1.5); // inherits sheared=true
+                if (sheared == null) continue;
+                StackUtils.setStackSize(sheared, 1, config);
+                level.addFreshEntity(sheared);
+            } catch (Exception e) {
+                StackMobsMod.LOGGER.warn(
+                    "[StackMobs] Failed to spawn sheared sheep: {}", e.getMessage());
+            }
         }
 
         // ── Spawn the un-sheared remainder as a separate entity ───────────────

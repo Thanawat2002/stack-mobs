@@ -9,6 +9,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -49,6 +50,10 @@ public final class StackUtils {
         if (!config.isWhitelisted(id)) return false;
 
         if (isPlayerManaged(entity))   return false;
+
+        // Sheared sheep stay single so each regrows its own wool by eating
+        // grass; they rejoin a stack once their wool is back.
+        if (entity instanceof Sheep sheep && sheep.isSheared()) return false;
 
         return true;
     }
@@ -140,6 +145,14 @@ public final class StackUtils {
         }
         if (source instanceof Sheep srcSheep && copy instanceof Sheep copySheep) {
             copySheep.setSheared(srcSheep.isSheared());
+        }
+        // Breeding cooldown: ours and vanilla's (a positive age on an adult),
+        // so split-off mobs can't be fed again before the rest of their group
+        ((StackedMob) copy).stackmobs$setBreedCooldownUntil(
+            ((StackedMob) source).stackmobs$getBreedCooldownUntil());
+        if (source instanceof AgeableMob srcAgeable && copy instanceof AgeableMob copyAgeable
+                && srcAgeable.getAge() > 0) {
+            copyAgeable.setAge(srcAgeable.getAge());
         }
 
         RandomSource rng = level.getRandom();

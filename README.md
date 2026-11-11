@@ -126,7 +126,7 @@ All commands require operator level 2.
 | `/stackmob toggle` | Enable / disable merging of new stacks (existing stacks keep working) |
 | `/stackmob info` | Show current config and stats |
 | `/stackmob unstack [radius]` | Split stacked mobs near you (default 32 blocks) |
-| `/stackmob killall` | Kill every stacked mob across all dimensions |
+| `/stackmob killall` | Kill every stacked mob across all dimensions (one mob's drops per stack) |
 | `/stackmob debug` | Dump the active stack registry to chat |
 
 ---
@@ -206,6 +206,16 @@ When the last stack member dies (stack size = 1), vanilla death occurs
 normally.
 
 **Total loot = stackSize × single-entity drops** across all deaths.
+
+Removal damage — `/kill`, `/stackmob killall` and falling into the void —
+removes the whole stack at once with a single mob's drops, so clearing a large
+stack doesn't flood the world with items.
+
+### Shearing
+Shearing a sheep stack clips as many sheep as the shears have durability left.
+Each sheared sheep becomes its own entity and never stacks, so it regrows its
+wool by eating grass just like in vanilla. Once its wool is back, it rejoins a
+nearby stack on the next merge scan. The un-sheared remainder stays a stack.
 
 ### Unstacking
 Use `/stackmob unstack` or `StackMobAPI.INSTANCE.split()` to spawn all
